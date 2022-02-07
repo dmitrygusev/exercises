@@ -139,8 +139,12 @@ and lower than 6 elements (4, 5, 6, 7, 8 and 9).
 -}
 lowerAndGreater :: Int -> [Int] -> [Char]
 lowerAndGreater n list = let
-    count :: (Int -> Bool) -> Int
-    count p = length (filter p list)
-    lt = count (< n)
-    gt = count (> n)
-    in show n ++ " is greater than " ++ show lt ++ " elements and lower than " ++ show gt ++ " elements"
+    go :: (Int, Int) -> [Int] -> [Char]
+    go (lt, gt) [] =
+        show n ++ " is greater than " ++ show lt ++ " elements and lower than " ++ show gt ++ " elements"
+    go (lt, gt) (x : xs)
+        | x < n = go (lt + 1, gt) xs
+        | x > n = go (lt, gt + 1) xs
+        | x == n = go (lt, gt) xs
+        | otherwise = []
+    in go (0, 0) list
