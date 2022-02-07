@@ -86,12 +86,9 @@ function.
 -}
 minmax :: Int -> Int -> Int -> Int
 minmax x y z = let
-    min1 = min x y
-    min2 = min min1 z
-    max1 = max x y
-    max2 = max max1 z
-    in
-        max2 - min2
+    minV = minimum [x, y, z]
+    maxV = maximum [x, y, z]
+    in maxV - minV
 
 {- | Implement a function that takes a string, start and end positions
 and returns a substring of a given string from the start position to
