@@ -122,7 +122,7 @@ and finds a sum of the numbers inside this string.
 The string contains only spaces and/or numbers.
 -}
 strSum :: [Char] -> Int
-strSum str = foldr ((+) . (read::String->Int)) 0 (words str)
+strSum str = sum (map read (words str))
 
 {- | Write a function that takes a number and a list of numbers and
 returns a string, saying how many elements of the list are strictly
