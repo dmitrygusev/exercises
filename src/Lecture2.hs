@@ -17,6 +17,8 @@ challenging exercises. You don't need to solve them to finish the
 course but you can if you like challenges :)
 -}
 
+{-# LANGUAGE ScopedTypeVariables   #-}
+
 module Lecture2
     ( -- * Normal
       lazyProduct
@@ -37,11 +39,13 @@ module Lecture2
     , EvalError (..)
     , eval
     , constantFolding
-    , Chest(..), dragonFight) where
+    , Chest(..)
+    , dragonFight) where
 
 -- VVV If you need to import libraries, do it after this line ... VVV
 
 import Data.Foldable (find)
+import Data.Char (isSpace)
 
 -- ^^^ and before this line. Otherwise the test suite might fail  ^^^
 
@@ -53,7 +57,6 @@ zero, you can stop calculating product and return 0 immediately.
 84
 -}
 lazyProduct :: [Int] -> Int
-lazyProduct (0 : _) = 0
 lazyProduct list = let
   go :: Int -> [Int] -> Int
   go _ (0 : _) = 0
@@ -70,7 +73,8 @@ lazyProduct list = let
 "ccaabb"
 -}
 duplicate :: [a] -> [a]
-duplicate list = list >>= replicate 2
+duplicate [] = []
+duplicate (x : xs) = x : x : duplicate xs
 
 {- | Implement function that takes index and a list and removes the
 element at the given position. Additionally, this function should also
@@ -86,9 +90,9 @@ removeAt :: Int -> [a] -> (Maybe a, [a])
 removeAt n list
   | n < 0 = (Nothing, list)
   | otherwise = let
-    rest = drop n list
-    removed = find (const True) (take 1 rest)
-    newList = (take n list ++ drop 1 rest)
+    (left, right) = splitAt n list
+    removed = find (const True) (take 1 right)
+    newList = (left ++ drop 1 right)
     in (removed, newList)
 
 {- | Write a function that takes a list of lists and returns only
@@ -118,7 +122,7 @@ spaces.
 🕯 HINT: look into Data.Char and Prelude modules for functions you may use.
 -}
 dropSpaces :: [Char] -> [Char]
-dropSpaces = takeWhile (/= ' ') . dropWhile (== ' ')
+dropSpaces = takeWhile (not . isSpace) . dropWhile isSpace
 
 
 {- |
@@ -224,28 +228,28 @@ reward dragon chest =
   , rewardTreasure = chestTreasure chest
   , rewardGold = chestGold chest }
 
-dragonFight :: Knight -> Dragon -> Chest a -> Outcome a
+dragonFight :: forall a . Knight -> Dragon -> Chest a -> Outcome a
 dragonFight knight dragon chest =
   let
-    -- `Chest a` is only here to capture type `a` from the dragonFligt declaration
-    --  Is it possible to capture type variable for the `a` somehow
-    --  without passing `chest` as the last param of the `go` function?
-    go :: Int -> Knight -> Dragon -> Chest a-> Outcome a
-    go step k d c
-      | dragonHealth    d <= 0 = DragonDies (reward d c)
+    go :: Int -> Knight -> Dragon -> Outcome a
+    go step k d
+      | dragonHealth    d <= 0 = DragonDies (reward d chest)
       | knightHealth    k <= 0 = KinghtDies
       | knightEndurance k <= 0 = KnightRuns
       | otherwise = -- next move
         let
           k2 = k {
             knightEndurance = knightEndurance k - 1
-          , knightHealth = if mod step 10 == 0 then knightHealth k - dragonFirePower d else knightHealth k
+          , knightHealth =
+              if mod step 10 == 0
+                then knightHealth k - dragonFirePower d
+                else knightHealth k
           }
           d2 = d {
             dragonHealth = dragonHealth d - knightAttackAmount k
           }
-        in go (step + 1) k2 d2 c
-  in go 1 knight dragon chest
+        in go (step + 1) k2 d2
+  in go 1 knight dragon
 
 {-
 
@@ -302,11 +306,11 @@ merge :: [Int] -> [Int] -> [Int]
 merge l1 l2 =
   let
     go :: [Int] -> [Int] -> [Int]
-    go [] [] = []
     go [] b = b
     go a [] = a
     go (a : as) (b : bs)
-      | a <= b = (a : go as (b : bs))
+      | a == b = (a : b : go as bs)
+      | a < b = (a : go as (b : bs))
       | otherwise = (b : go (a : as) bs)
   in
     go l1 l2
@@ -334,8 +338,7 @@ mergeSort [a, b]
   | otherwise = [b, a]
 mergeSort a =
   let
-    n = length a
-    (l1, l2) = splitAt (div n 2) a
+    (l1, l2) = splitAt 2 a
   in
      merge (mergeSort l1) (mergeSort l2)
 
@@ -435,9 +438,9 @@ Add (Lit 45) (Add (Var "x") (Var "y"))
 -}
 constantFolding :: Expr -> Expr
 constantFolding expr = let
-    go :: Expr -> ([Expr], [Expr]) -> ([Expr], [Expr])
-    go (Lit value) (ls, vs) = (Lit value : ls, vs)
-    go (Var name) (ls, vs) = (ls, Var name : vs)
+    go :: Expr -> ([Int], [String]) -> ([Int], [String])
+    go (Lit value) (ls, vs) = (value : ls, vs)
+    go (Var name) (ls, vs) = (ls, name : vs)
     go (Add a b) (ls, vs) =
       let
         (aLs, aVs) = go a ([], [])
@@ -445,22 +448,16 @@ constantFolding expr = let
       in
         (aLs ++ bLs ++ ls, aVs ++ bVs ++ vs)
 
-    sumExpr :: [Expr] -> Expr
-    sumExpr [] = error "Syntax error?"
-    sumExpr [e] = e
-    sumExpr (e : rest) = Add e (sumExpr rest)
+    sumExpr :: Expr -> [Expr] -> Expr
+    sumExpr a [] = a
+    sumExpr a (b : bs) = Add a (sumExpr b bs)
 
     (usedLs, usedVs) = go expr ([], [])
 
-    constantLiteral =
-      case usedLs of
-        [] -> Lit 0
-        _ ->  case eval [] (sumExpr usedLs) of
-          Left _ -> error "Unexpected error evaluated literal expression"
-          Right value -> Lit value
+    constantLiteral = sum usedLs
 
   in case constantLiteral of
-    Lit 0 -> case usedVs of
+    0 -> case usedVs of
       [] -> Lit 0
-      _ -> sumExpr usedVs
-    _ -> sumExpr (constantLiteral : usedVs)
+      (v : vs) -> sumExpr (Var v) (map Var vs)
+    _ -> sumExpr (Lit constantLiteral) (map Var usedVs)
