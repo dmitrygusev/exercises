@@ -17,6 +17,8 @@ challenging exercises. You don't need to solve them to finish the
 course but you can if you like challenges :)
 -}
 
+{-# LANGUAGE ScopedTypeVariables   #-}
+
 module Lecture2
     ( -- * Normal
       lazyProduct
@@ -26,7 +28,6 @@ module Lecture2
     , dropSpaces
 
     , Knight (..)
-    , dragonFight
 
       -- * Hard
     , isIncreasing
@@ -38,9 +39,13 @@ module Lecture2
     , EvalError (..)
     , eval
     , constantFolding
-    ) where
+    , Chest(..)
+    , dragonFight) where
 
 -- VVV If you need to import libraries, do it after this line ... VVV
+
+import Data.Foldable (find)
+import Data.Char (isSpace)
 
 -- ^^^ and before this line. Otherwise the test suite might fail  ^^^
 
@@ -52,7 +57,13 @@ zero, you can stop calculating product and return 0 immediately.
 84
 -}
 lazyProduct :: [Int] -> Int
-lazyProduct = error "TODO"
+lazyProduct list = let
+  go :: Int -> [Int] -> Int
+  go _ (0 : _) = 0
+  go p [] = p
+  go p (x : xs) = go (p * x) xs
+  in go 1 list
+
 
 {- | Implement a function that duplicates every element in the list.
 
@@ -62,7 +73,8 @@ lazyProduct = error "TODO"
 "ccaabb"
 -}
 duplicate :: [a] -> [a]
-duplicate = error "TODO"
+duplicate [] = []
+duplicate (x : xs) = x : x : duplicate xs
 
 {- | Implement function that takes index and a list and removes the
 element at the given position. Additionally, this function should also
@@ -74,7 +86,14 @@ return the removed element.
 >>> removeAt 10 [1 .. 5]
 (Nothing,[1,2,3,4,5])
 -}
-removeAt = error "TODO"
+removeAt :: Int -> [a] -> (Maybe a, [a])
+removeAt n list
+  | n < 0 = (Nothing, list)
+  | otherwise = let
+    (left, right) = splitAt n list
+    removed = find (const True) (take 1 right)
+    newList = (left ++ drop 1 right)
+    in (removed, newList)
 
 {- | Write a function that takes a list of lists and returns only
 lists of even lengths.
@@ -85,7 +104,8 @@ lists of even lengths.
 ♫ NOTE: Use eta-reduction and function composition (the dot (.) operator)
   in this function.
 -}
-evenLists = error "TODO"
+evenLists :: [[a]] -> [[a]]
+evenLists = filter (even . length)
 
 {- | The @dropSpaces@ function takes a string containing a single word
 or number surrounded by spaces and removes all leading and trailing
@@ -101,7 +121,9 @@ spaces.
 
 🕯 HINT: look into Data.Char and Prelude modules for functions you may use.
 -}
-dropSpaces = error "TODO"
+dropSpaces :: [Char] -> [Char]
+dropSpaces = takeWhile (not . isSpace) . dropWhile isSpace
+
 
 {- |
 
@@ -159,12 +181,93 @@ You're free to define any helper functions.
 
 -- some help in the beginning ;)
 data Knight = Knight
-    { knightHealth    :: Int
-    , knightAttack    :: Int
-    , knightEndurance :: Int
+    { knightHealth            :: Int
+    , knightAttackAmount      :: Int
+    , knightEndurance         :: Int
     }
+  deriving (Show)
 
-dragonFight = error "TODO"
+data Chest a = Chest
+  { chestGold     :: Int
+  , chestTreasure :: Maybe a
+  }
+  deriving (Show)
+
+data DragonColour = Red | Black | Green
+  deriving (Show)
+
+data Dragon = Dragon
+  { dragonColour     :: DragonColour
+  , dragonExperience :: Int
+  , dragonHealth     :: Int
+  , dragonFirePower  :: Int
+  }
+  deriving (Show)
+
+data Reward a = Reward
+  { rewardExperience :: Int
+  , rewardTreasure   :: Maybe a
+  , rewardGold       :: Int
+  }
+  deriving (Show)
+
+data Outcome a = KinghtDies
+  | KnightRuns
+  | DragonDies (Reward a)
+  deriving (Show)
+
+reward :: Dragon -> Chest a -> Reward a
+reward (Dragon Green experience _ _) chest =
+  Reward
+  { rewardExperience = experience
+  , rewardTreasure = Nothing
+  , rewardGold = chestGold chest }
+reward dragon chest =
+  Reward
+  { rewardExperience = dragonExperience dragon
+  , rewardTreasure = chestTreasure chest
+  , rewardGold = chestGold chest }
+
+dragonFight :: forall a . Knight -> Dragon -> Chest a -> Outcome a
+dragonFight knight dragon chest =
+  let
+    go :: Int -> Knight -> Dragon -> Outcome a
+    go step k d
+      | dragonHealth    d <= 0 = DragonDies (reward d chest)
+      | knightHealth    k <= 0 = KinghtDies
+      | knightEndurance k <= 0 = KnightRuns
+      | otherwise = -- next move
+        let
+          k2 = k {
+            knightEndurance = knightEndurance k - 1
+          , knightHealth =
+              if mod step 10 == 0
+                then knightHealth k - dragonFirePower d
+                else knightHealth k
+          }
+          d2 = d {
+            dragonHealth = dragonHealth d - knightAttackAmount k
+          }
+        in go (step + 1) k2 d2
+  in go 1 knight dragon
+
+{-
+
+>>> dragonFight Knight { knightHealth = 10, knightAttackAmount = 2, knightEndurance = 10}  Dragon { dragonColour = Red, dragonExperience = 5, dragonHealth = 5, dragonFirePower = 100 }  Chest { chestGold = 100, chestTreasure = Just "Ruby" }
+DragonDies (Reward {rewardExperience = 5, rewardTreasure = Just "Ruby", rewardGold = 100})
+  
+  Green dragons melt the treasure:
+>>> dragonFight Knight { knightHealth = 10, knightAttackAmount = 2, knightEndurance = 10}  Dragon { dragonColour = Green, dragonExperience = 5, dragonHealth = 5, dragonFirePower = 100 }  Chest { chestGold = 100, chestTreasure = Just "Ruby" }
+DragonDies (Reward {rewardExperience = 5, rewardTreasure = Nothing, rewardGold = 100})
+
+>>> dragonFight Knight { knightHealth = 10, knightAttackAmount = 2, knightEndurance = 100}  Dragon { dragonColour = Green, dragonExperience = 5, dragonHealth = 50, dragonFirePower = 100 }  Chest { chestGold = 100, chestTreasure = Just "Ruby" }
+KinghtDies
+
+>>> dragonFight Knight { knightHealth = 2000, knightAttackAmount = 2, knightEndurance = 2}  Dragon { dragonColour = Green, dragonExperience = 5, dragonHealth = 50, dragonFirePower = 100 }  Chest { chestGold = 100, chestTreasure = Just "Ruby" }
+KnightRuns
+
+-}
+
 
 ----------------------------------------------------------------------------
 -- Extra Challenges
@@ -185,7 +288,9 @@ False
 True
 -}
 isIncreasing :: [Int] -> Bool
-isIncreasing = error "TODO"
+isIncreasing [] = True -- Consider empty lists always increasing
+isIncreasing [_] = True -- last element in the list is always increasing
+isIncreasing (x : y : ys) = x < y && isIncreasing (y : ys)
 
 {- | Implement a function that takes two lists, sorted in the
 increasing order, and merges them into new list, also sorted in the
@@ -198,7 +303,18 @@ verify that.
 [1,2,3,4,7]
 -}
 merge :: [Int] -> [Int] -> [Int]
-merge = error "TODO"
+merge l1 l2 =
+  let
+    go :: [Int] -> [Int] -> [Int]
+    go [] b = b
+    go a [] = a
+    go (a : as) (b : bs)
+      | a == b = (a : b : go as bs)
+      | a < b = (a : go as (b : bs))
+      | otherwise = (b : go (a : as) bs)
+  in
+    go l1 l2
+
 
 {- | Implement the "Merge Sort" algorithm in Haskell. The @mergeSort@
 function takes a list of numbers and returns a new list containing the
@@ -215,7 +331,16 @@ The algorithm of merge sort is the following:
 [1,2,3]
 -}
 mergeSort :: [Int] -> [Int]
-mergeSort = error "TODO"
+mergeSort [] = []
+mergeSort [a] = [a]
+mergeSort [a, b]
+  | a <= b = [a, b]
+  | otherwise = [b, a]
+mergeSort a =
+  let
+    (l1, l2) = splitAt 2 a
+  in
+     merge (mergeSort l1) (mergeSort l2)
 
 
 {- | Haskell is famous for being a superb language for implementing
@@ -266,9 +391,25 @@ data EvalError
 
 {- | Having all this set up, we can finally implement an evaluation function.
 It returns either a successful evaluation result or an error.
+
+>>> eval [("y", 1), ("x", 2)] (Add (Var "y") (Add (Var "x") (Lit 10)))
+Right 13
 -}
 eval :: Variables -> Expr -> Either EvalError Int
-eval = error "TODO"
+eval vars expr =
+  let
+    go :: Expr -> Either EvalError Int
+    go (Lit value) = Right value
+    go (Var name) = case lookup name vars of
+      Just value -> Right value
+      Nothing -> Left (VariableNotFound name)
+    go (Add a b) = case (go a, go b) of
+        (Left aValue, _) -> Left aValue
+        (_, Left bValue) -> Left bValue
+        (Right aValue, Right bValue) -> Right (aValue + bValue)
+  in
+    go expr
+
 
 {- | Compilers also perform optimizations! One of the most common
 optimizations is "Constant Folding". It performs arithmetic operations
@@ -290,6 +431,33 @@ x + 45 + y
 
 Write a function that takes and expression and performs "Constant
 Folding" optimization on the given expression.
+
+>>> constantFolding (Add (Var "x") (Add (Lit 10) (Add (Var "y") (Add (Lit 15) (Lit 20)))))
+Add (Lit 45) (Add (Var "x") (Var "y"))
+
 -}
 constantFolding :: Expr -> Expr
-constantFolding = error "TODO"
+constantFolding expr = let
+    go :: Expr -> ([Int], [String]) -> ([Int], [String])
+    go (Lit value) (ls, vs) = (value : ls, vs)
+    go (Var name) (ls, vs) = (ls, name : vs)
+    go (Add a b) (ls, vs) =
+      let
+        (aLs, aVs) = go a ([], [])
+        (bLs, bVs) = go b ([], [])
+      in
+        (aLs ++ bLs ++ ls, aVs ++ bVs ++ vs)
+
+    sumExpr :: Expr -> [Expr] -> Expr
+    sumExpr a [] = a
+    sumExpr a (b : bs) = Add a (sumExpr b bs)
+
+    (usedLs, usedVs) = go expr ([], [])
+
+    constantLiteral = sum usedLs
+
+  in case constantLiteral of
+    0 -> case usedVs of
+      [] -> Lit 0
+      (v : vs) -> sumExpr (Var v) (map Var vs)
+    _ -> sumExpr (Lit constantLiteral) (map Var usedVs)
