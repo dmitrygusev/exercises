@@ -286,9 +286,7 @@ True
 isIncreasing :: [Int] -> Bool
 isIncreasing [] = True -- Consider empty lists always increasing
 isIncreasing [_] = True -- last element in the list is always increasing
-isIncreasing (x : xs)
-  | x < head xs = isIncreasing xs
-  | otherwise = False
+isIncreasing (x : y : ys) = x < y && isIncreasing (y : ys)
 
 {- | Implement a function that takes two lists, sorted in the
 increasing order, and merges them into new list, also sorted in the
