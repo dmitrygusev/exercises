@@ -251,8 +251,9 @@ instance Foldable List1 where
   foldr f b (List1 a []) = f a b
   foldr f b (List1 a (a1 : a1s)) = f a (foldr f b (List1 a1 a1s))
 
-  -- foldMap :: Monoid m => (a -> m) -> List1 a -> m
-  -- foldMap f a = f a
+  foldMap :: Monoid m => (a -> m) -> List1 a -> m
+  foldMap f (List1 a []) = f a
+  foldMap f (List1 a (a1 : a1s)) = f a <> foldMap f (List1 a1 a1s)
 
 instance Foldable Treasure where
   foldr :: (a -> b -> b) -> b -> Treasure a -> b
