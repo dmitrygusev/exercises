@@ -246,7 +246,14 @@ types that can have such an instance.
 -- instance Foldable Weekday where -- Not a `* -> *` kind, cannot have a Monoid
 -- instance Foldable Gold where -- Not a `* -> *` kind
 -- instance Foldable Reward where -- Not a `* -> *` kind
--- instance Foldable List1 where -- List1 cannot have a Monoid
+instance Foldable List1 where
+  foldr :: (a -> b -> b) -> b -> List1 a -> b
+  foldr f b (List1 a []) = f a b
+  foldr f b (List1 a (a1 : a1s)) = f a (foldr f b (List1 a1 a1s))
+
+  -- foldMap :: Monoid m => (a -> m) -> List1 a -> m
+  -- foldMap f a = f a
+
 instance Foldable Treasure where
   foldr :: (a -> b -> b) -> b -> Treasure a -> b
   foldr _ b NoTreasure = b
