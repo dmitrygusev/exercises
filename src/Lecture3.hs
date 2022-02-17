@@ -64,7 +64,7 @@ of a weekday.
 "Mon"
 -}
 toShortString :: Show a => a -> [Char]
-toShortString a = take 3 (show a)
+toShortString = take 3 . show
 
 {- | Write a function that returns next day of the week, following the
 given day.
