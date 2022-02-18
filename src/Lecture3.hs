@@ -1,6 +1,7 @@
 {-# LANGUAGE
       InstanceSigs,
-      GeneralizedNewtypeDeriving
+      GeneralizedNewtypeDeriving,
+      ScopedTypeVariables
 #-}
 
 {- |
@@ -97,8 +98,14 @@ weekday to the second.
 >>> daysTo Friday Wednesday
 5
 -}
-daysTo :: (Enum a, Bounded a, Eq a) => a -> a -> Int
-daysTo a b = length (takeWhile (/= b) (iterate next a))
+daysTo :: forall a . (Enum a, Bounded a) => a -> a -> Int
+daysTo a b =
+  let
+    ai = fromEnum a
+    bi = fromEnum b
+    maxi = fromEnum (maxBound :: a)
+  in
+    if bi >= ai then bi - ai else bi + maxi - ai + 1
 
 {-
 
@@ -249,7 +256,7 @@ types that can have such an instance.
 instance Foldable List1 where
   foldr :: (a -> b -> b) -> b -> List1 a -> b
   foldr f b (List1 a []) = f a b
-  foldr f b (List1 a (a1 : a1s)) = f a (foldr f b (List1 a1 a1s))
+  foldr f b (List1 a as) = f a (foldr f b as)
 
   foldMap :: Monoid m => (a -> m) -> List1 a -> m
   foldMap f (List1 a []) = f a
