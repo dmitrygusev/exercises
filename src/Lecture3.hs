@@ -143,7 +143,7 @@ instance Semigroup Reward where
 instance Monoid Reward where
   mempty =
     Reward
-    { rewardGold = 0
+    { rewardGold = mempty
     , rewardSpecial = False
     }
 
