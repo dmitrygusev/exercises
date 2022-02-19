@@ -1,3 +1,5 @@
+{-# LANGUAGE StrictData, BangPatterns #-}
+
 {- |
 Module                  : Lecture4
 Copyright               : (c) 2021-2022 Haskell Beginners 2022 Course
@@ -100,9 +102,9 @@ module Lecture4
     , printProductStats
     ) where
 
-import Data.List (findIndex)
-import Data.List.NonEmpty as NE (NonEmpty (..), map)
-import Data.Semigroup (Max (..), Min (..), Semigroup (..), Sum (..))
+import Data.List (findIndex, foldl')
+import Data.List.NonEmpty (NonEmpty (..))
+import Data.Semigroup (Max (..), Min (..), Sum (..))
 import Text.Read (readMaybe)
 import Data.Maybe (mapMaybe)
 import System.Environment (getArgs)
@@ -223,12 +225,18 @@ instance Semigroup Stats where
       , statsTotalSum       =       statsTotalSum a <> statsTotalSum b
       , statsAbsoluteMax    =    statsAbsoluteMax a <> statsAbsoluteMax b
       , statsAbsoluteMin    =    statsAbsoluteMin a <> statsAbsoluteMin b
-      , statsSellMax        =        statsSellMax a <> statsSellMax b
-      , statsSellMin        =        statsSellMin a <> statsSellMin b 
-      , statsBuyMax         =         statsBuyMax a <> statsBuyMax b
-      , statsBuyMin         =         statsBuyMin a <> statsBuyMin b
+      , statsSellMax        =        statsSellMax a <!> statsSellMax b
+      , statsSellMin        =        statsSellMin a <!> statsSellMin b
+      , statsBuyMax         =         statsBuyMax a <!> statsBuyMax b
+      , statsBuyMin         =         statsBuyMin a <!> statsBuyMin b
       , statsLongest        =        statsLongest a <> statsLongest b
       }
+
+(<!>) :: Semigroup a => Maybe a -> Maybe a -> Maybe a
+(Just !a) <!> (Just !b) = Just (a <> b)
+(Just !a) <!> Nothing = Just a
+Nothing <!> (Just !b) = Just b
+_ <!> _ = Nothing
 
 {-
 The reason for having the 'Stats' data type is to be able to convert
@@ -295,7 +303,12 @@ implement the next task.
 -}
 
 combineRows :: NonEmpty Row -> Stats
-combineRows = sconcat . NE.map rowToStats
+combineRows (r :| rs) =
+   let
+      firstStat = rowToStats r
+      otherStats = map rowToStats rs
+   in
+      foldl' (<>) firstStat otherStats
 
 {-
 After we've calculated stats for all rows, we can then pretty-print
